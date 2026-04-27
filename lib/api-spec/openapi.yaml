@@ -3,20 +3,29 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: WhatsApp Attendant API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: whatsapp
+    description: WhatsApp connection state
+  - name: settings
+    description: Agent settings
+  - name: contacts
+    description: WhatsApp contacts and conversations
+  - name: messages
+    description: WhatsApp messages
+  - name: stats
+    description: Dashboard stats
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +33,148 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /whatsapp/state:
+    get:
+      operationId: getWhatsappState
+      tags: [whatsapp]
+      summary: Current WhatsApp connection state
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappState"
+
+  /whatsapp/connect:
+    post:
+      operationId: connectWhatsapp
+      tags: [whatsapp]
+      summary: Start a connection (generates a QR if needed)
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappState"
+
+  /whatsapp/disconnect:
+    post:
+      operationId: disconnectWhatsapp
+      tags: [whatsapp]
+      summary: Disconnect and forget the session
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhatsappState"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get agent settings
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update agent settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsBody"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List active conversations
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+
+  /contacts/{jid}/messages:
+    get:
+      operationId: listContactMessages
+      tags: [messages]
+      summary: List messages for a contact
+      parameters:
+        - in: path
+          name: jid
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendContactMessage
+      tags: [messages]
+      summary: Send a message manually as the owner
+      parameters:
+        - in: path
+          name: jid
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Dashboard summary
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +185,159 @@ components:
       required:
         - status
 
+    WhatsappState:
+      type: object
+      properties:
+        status:
+          type: string
+          description: disconnected | qr_pending | connecting | connected | logged_out
+        qrCode:
+          type: ["string", "null"]
+          description: Base64 PNG data URL of the pairing QR code
+        phoneNumber:
+          type: ["string", "null"]
+        connectedAt:
+          type: ["string", "null"]
+          format: date-time
+      required:
+        - status
+        - qrCode
+        - phoneNumber
+        - connectedAt
+
+    Settings:
+      type: object
+      properties:
+        mode:
+          type: string
+          description: agent (AI auto-replies) | owner (user is online and AI is paused)
+        ownerName:
+          type: string
+        agentName:
+          type: string
+        agentPersona:
+          type: string
+        voiceEnabled:
+          type: boolean
+        voice:
+          type: string
+        autoReplyAudioForAudio:
+          type: boolean
+      required:
+        - mode
+        - ownerName
+        - agentName
+        - agentPersona
+        - voiceEnabled
+        - voice
+        - autoReplyAudioForAudio
+
+    UpdateSettingsBody:
+      type: object
+      properties:
+        mode:
+          type: string
+        ownerName:
+          type: string
+        agentName:
+          type: string
+        agentPersona:
+          type: string
+        voiceEnabled:
+          type: boolean
+        voice:
+          type: string
+        autoReplyAudioForAudio:
+          type: boolean
+
+    Contact:
+      type: object
+      properties:
+        jid:
+          type: string
+        name:
+          type: string
+        lastMessageAt:
+          type: ["string", "null"]
+          format: date-time
+        lastMessagePreview:
+          type: ["string", "null"]
+        unread:
+          type: integer
+        messageCount:
+          type: integer
+      required:
+        - jid
+        - name
+        - lastMessageAt
+        - lastMessagePreview
+        - unread
+        - messageCount
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        contactJid:
+          type: string
+        fromMe:
+          type: boolean
+        isAi:
+          type: boolean
+        kind:
+          type: string
+          description: text | audio
+        text:
+          type: ["string", "null"]
+        audioUrl:
+          type: ["string", "null"]
+        durationSeconds:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - contactJid
+        - fromMe
+        - isAi
+        - kind
+        - text
+        - audioUrl
+        - durationSeconds
+        - createdAt
+
+    SendMessageBody:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    Stats:
+      type: object
+      properties:
+        totalContacts:
+          type: integer
+        totalMessages:
+          type: integer
+        aiRepliesToday:
+          type: integer
+        manualRepliesToday:
+          type: integer
+        incomingToday:
+          type: integer
+        connected:
+          type: boolean
+        mode:
+          type: string
+      required:
+        - totalContacts
+        - totalMessages
+        - aiRepliesToday
+        - manualRepliesToday
+        - incomingToday
+        - connected
+        - mode
