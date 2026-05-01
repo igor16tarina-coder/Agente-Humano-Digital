@@ -1,22 +1,10 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { bootstrap } from "./lib/whatsapp/service";
+import { bootstrap } from "./lib/whatsapp/server";
 
-const rawPort = process.env["PORT"];
+const port = process.env.PORT || 8080;
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-app.listen(port, async (err) => {
+app.listen(port, async (err: any) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
